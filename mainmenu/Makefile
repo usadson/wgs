@@ -2,7 +2,8 @@ CC = clang
 CFLAGS = -g -Og -I. -I/usr/local/include
 LDFLAGS = -L/usr/local/lib \
 	  -lpthread \
-	  -lX11 -lxcb -lXau -lXdmcp
+	  -lX11 \
+	  -lGL -lGLU
 
 test: main.c
 	$(CC) $(CFLAGS) -o $@ main.c $(LDFLAGS)

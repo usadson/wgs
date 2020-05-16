@@ -37,6 +37,10 @@
 #include <X11/Xutil.h>
 #include <X11/keysymdef.h>
 
+#include <GL/gl.h>
+#include <GL/glx.h>
+#include <GL/glu.h>
+
 int main(void) {
 	Display *display;
 	Window window;
