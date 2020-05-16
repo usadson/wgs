@@ -53,7 +53,7 @@ int main(void) {
 	screenId = DefaultScreen(display);
 
 	window = XCreateSimpleWindow(display, RootWindowOfScreen(screen), 0, 0,
-								 320, 200, 1, BlackPixel(display, screenId),
+								 screen->width, screen->height, 0, 0,
 								 WhitePixel(display, screenId));
 
 	XSelectInput(display, window, KeyPressMask | KeyReleaseMask
