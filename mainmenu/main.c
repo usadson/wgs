@@ -75,6 +75,7 @@ int main(void) {
 			break;
 			case KeyPress:
 				len = XLookupString(&ev.xkey, str, 25, &keysym, NULL);
+				str[len] = '\0';
 				if (len > 0) {
 					printf("Key pressed: '%s' %i %zu\n", str, len,
 						   (size_t) keysym);
@@ -85,6 +86,7 @@ int main(void) {
 			break;
 			case KeyRelease:
 				len = XLookupString(&ev.xkey, str, 25, &keysym, NULL);
+				str[len] = '\0';
 				if (len > 0) {
 					printf("Key released: '%s' %i %zu\n", str, len,
 						   (size_t) keysym);
