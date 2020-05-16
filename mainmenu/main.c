@@ -95,10 +95,6 @@ int main(void) {
 						   visualInfo->depth, InputOutput, visualInfo->visual,
 						   CWColormap | CWEventMask, &windowAttributes);
 
-// 	window = XCreateSimpleWindow(display, RootWindowOfScreen(screen), 0, 0,
-// 								 screen->width, screen->height, 0, 0,
-// 								 WhitePixel(display, screenId));
-
 	XClearWindow(display, window);
 	XMapRaised(display, window);
 
@@ -150,7 +146,6 @@ int main(void) {
 }
 
 void renderFrame(void) {
-	puts("ok");
-	glClearColor(0.33, 0.25, 0.99, 1);
+	glClearColor((double)rand() / RAND_MAX, (double)rand() / RAND_MAX, (double)rand() / RAND_MAX, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
 }
