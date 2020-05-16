@@ -41,27 +41,63 @@
 #include <GL/glx.h>
 #include <GL/glu.h>
 
+/** Function Prototypes **/
+void renderFrame(void);
+
+/** Global variables **/
+GLint att[] = { GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None };
+
 int main(void) {
+	/* X info */
 	Display *display;
+	Window rootWindow;
 	Window window;
 	Screen *screen;
 	int screenId;
 	XEvent ev;
+	XVisualInfo *visualInfo;
+	XSetWindowAttributes windowAttributes;
+
+	/* GLX info */
+	Colormap colormap;
+	GLXContext context;
 
 	display = XOpenDisplay(NULL);
 	if (display == NULL) {
 		fputs("Could not open display", stderr);
 		return 1;
 	}
+
 	screen = DefaultScreenOfDisplay(display);
 	screenId = DefaultScreen(display);
+	rootWindow = RootWindowOfScreen(screen);
 
-	window = XCreateSimpleWindow(display, RootWindowOfScreen(screen), 0, 0,
-								 screen->width, screen->height, 0, 0,
-								 WhitePixel(display, screenId));
+	visualInfo = glXChooseVisual(display, 0, att);
 
-	XSelectInput(display, window, KeyPressMask | KeyReleaseMask
-								| KeymapStateMask);
+	if (visualInfo == NULL) {
+		XCloseDisplay(display);
+		printf("\n\tno appropriate visual found\n\n");
+		return EXIT_FAILURE;
+	}
+
+	printf("\n\tvisual %p selected\n", (void *) visualInfo->visualid);
+
+	colormap = XCreateColormap(display, rootWindow, visualInfo->visual, AllocNone);
+
+	windowAttributes.colormap = colormap;
+	windowAttributes.event_mask = ExposureMask
+								| KeyPressMask
+								| KeyReleaseMask
+								| KeymapStateMask;
+
+	window = XCreateWindow(display, rootWindow, 0, 0,
+						   screen->width, screen->height, 0,
+						   visualInfo->depth, InputOutput, visualInfo->visual,
+						   CWColormap | CWEventMask, &windowAttributes);
+
+// 	window = XCreateSimpleWindow(display, RootWindowOfScreen(screen), 0, 0,
+// 								 screen->width, screen->height, 0, 0,
+// 								 WhitePixel(display, screenId));
 
 	XClearWindow(display, window);
 	XMapRaised(display, window);
@@ -71,12 +107,20 @@ int main(void) {
 	int len = 0;
 	bool running = true;
 
+	context = glXCreateContext(display, visualInfo, NULL, GL_TRUE);
+	glXMakeCurrent(display, window, context);
+
 	while (running) {
 		XNextEvent(display, &ev);
+
 		switch(ev.type) {
+			case Expose:
+				renderFrame();
+				glXSwapBuffers(display, window);
+				break;
 			case KeymapNotify:
 				XRefreshKeyboardMapping(&ev.xmapping);
-			break;
+				break;
 			case KeyPress:
 				len = XLookupString(&ev.xkey, str, 25, &keysym, NULL);
 				str[len] = '\0';
@@ -87,7 +131,7 @@ int main(void) {
 				if (keysym == XK_Escape) {
 					running = false;
 				}
-			break;
+				break;
 			case KeyRelease:
 				len = XLookupString(&ev.xkey, str, 25, &keysym, NULL);
 				str[len] = '\0';
@@ -95,7 +139,7 @@ int main(void) {
 					printf("Key released: '%s' %i %zu\n", str, len,
 						   (size_t) keysym);
 				}
-			break;
+				break;
 		}
 	}
 
@@ -103,4 +147,10 @@ int main(void) {
 	XCloseDisplay(display);
 
 	return 1;
+}
+
+void renderFrame(void) {
+	puts("ok");
+	glClearColor(0.33, 0.25, 0.99, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
 }
