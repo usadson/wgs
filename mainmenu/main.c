@@ -27,6 +27,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +46,7 @@ int main(void) {
 
 	display = XOpenDisplay(NULL);
 	if (display == NULL) {
-		printf("%s\n", "Could not open display");
+		fputs("Could not open display", stderr);
 		return 1;
 	}
 	screen = DefaultScreenOfDisplay(display);
@@ -94,5 +95,6 @@ int main(void) {
 
 	XDestroyWindow(display, window);
 	XCloseDisplay(display);
+
 	return 1;
 }
