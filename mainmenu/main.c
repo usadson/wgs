@@ -27,6 +27,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/stat.h>
+
+#include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -37,17 +40,42 @@
 #include <X11/Xutil.h>
 #include <X11/keysymdef.h>
 
-#include <GL/gl.h>
+#include <GL/glew.h>
 #include <GL/glx.h>
-#include <GL/glu.h>
+
+struct ShaderData {
+	GLuint		fragmentShader;
+	GLuint		program;
+	GLuint		vertexShader;
+};
 
 /** Function Prototypes **/
-void renderFrame(void);
+void
+cleanShaders();
+
+char *
+loadFile(const char *);
+
+bool
+loadShader(const char *, GLenum, GLuint *);
+
+bool
+loadShaders(void);
+
+void
+renderFrame(void);
+
+
+/** Strings **/
+const char *fragShaderPath = "res/fragment_shader.glsl";
+const char *vertShaderPath = "res/vertex_shader.glsl";
 
 /** Global variables **/
 GLint att[] = { GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None };
+struct ShaderData	mainShader;
 
-int main(void) {
+int
+main(void) {
 	/* X info */
 	Display *display;
 	Window rootWindow;
@@ -79,8 +107,6 @@ int main(void) {
 		printf("\n\tno appropriate visual found\n\n");
 		return EXIT_FAILURE;
 	}
-
-	printf("\n\tvisual %p selected\n", (void *) visualInfo->visualid);
 
 	colormap = XCreateColormap(display, rootWindow, visualInfo->visual, AllocNone);
 
@@ -139,13 +165,159 @@ int main(void) {
 		}
 	}
 
+	/* Cleanup */
+	cleanShaders();
+
 	XDestroyWindow(display, window);
 	XCloseDisplay(display);
 
-	return 1;
+	return EXIT_SUCCESS;
 }
 
-void renderFrame(void) {
+void
+renderFrame(void) {
 	glClearColor((double)rand() / RAND_MAX, (double)rand() / RAND_MAX, (double)rand() / RAND_MAX, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
+}
+
+bool
+loadShaders(void) {
+	mainShader.program = glCreateProgram();
+	if (mainShader.program) {
+		fputs("[loadShaders] Failed to create shader program!", stderr);
+		return false;
+	}
+
+	if (!loadShader(vertShaderPath, GL_VERTEX_SHADER,
+					&mainShader.vertexShader)) {
+		glDeleteProgram(mainShader.program);
+		fputs("[loadShaders] Failed to load vertex shader!", stderr);
+		return false;
+	}
+
+	if (!loadShader(fragShaderPath, GL_FRAGMENT_SHADER,
+					&mainShader.fragmentShader)) {
+		glDeleteShader(mainShader.vertexShader);
+		glDeleteProgram(mainShader.program);
+		fputs("[loadShaders] Failed to load fragment shader!", stderr);
+		return false;
+	}
+
+	glAttachShader(mainShader.program, mainShader.vertexShader);
+	glAttachShader(mainShader.program, mainShader.fragmentShader);
+
+	/* glBindAttribLocation etc */
+	glLinkProgram(mainShader.program);
+
+	/* Perform checks with glValidateProgram */
+
+	/* bind uniform locations */
+	return true;
+}
+
+char *
+loadFile(const char *path) {
+	char		*buf;
+	int			 fd;
+	size_t		 len;
+	char		*pos;
+	ssize_t		 ret;
+	struct stat	 status;
+
+	fd = open(path, O_RDONLY);
+	if (fd == -1) {
+		perror("open() failure");
+		fprintf(stderr, "Failed to open '%s'. "
+				"See the error described above.\n", path);
+		return NULL;
+	}
+
+	if (fstat(fd, &status) == -1) {
+		perror("fstat() failure");
+		close(fd);
+		fprintf(stderr, "Failed to stat() '%s'. "
+			   "See the error described above.\n", path);
+		return NULL;
+	}
+
+	if (!S_ISREG(status.st_mode)) {
+		close(fd);
+		printf("'%s' isn't a normal file!\n", path);
+		return NULL;
+	}
+
+	len = (size_t) status.st_size;
+	buf = malloc(status.st_size + 1);
+	buf[len] = '\0';
+
+	if (buf == NULL) {
+		perror("Failed to allocate data for file");
+		close(fd);
+		fprintf(stderr, "Failed to allocate data for file '%s'!\n", path);
+		return NULL;
+	}
+
+	pos = buf;
+	while (len > 0) {
+		ret = read(fd, pos, len);
+
+		if (ret == 0)
+			break;
+
+		if (ret == -1) {
+			perror("Failed to read from file");
+			close(fd);
+			fprintf(stderr, "Failed to read from file '%s'!\n", path);
+			return NULL;
+		}
+
+		len -= ret;
+		pos += ret;
+	}
+
+	close(fd);
+	return buf;
+}
+
+bool
+loadShader(const char *path, GLenum type, GLuint *dest) {
+	GLuint	 shader;
+	char	*shaderData;
+	GLint	 status;
+
+	shader = glCreateShader(type);
+	if (shader == 0) {
+		fputs("[loadShader] Failed to glCreateShader()!\n", stderr);
+		return false;
+	}
+
+	shaderData = loadFile(path);
+	if (shaderData == NULL) {
+		glDeleteShader(shader);
+		fputs("[loadShader] Failed to load shader file!\n", stderr);
+		return false;
+	}
+
+	glShaderSource(shader, 1, (const char *const *) &shaderData, NULL);
+	free(shaderData);
+	glCompileShader(shader);
+
+	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
+	if (status == GL_FALSE) {
+		glDeleteShader(shader);
+		fputs("[loadShader] Failed to compile shader!\n", stderr);
+		return false;
+	}
+
+	*dest = shader;
+	return true;
+}
+
+void
+cleanShaders(void) {
+	glDetachShader(mainShader.program, mainShader.vertexShader);
+	glDetachShader(mainShader.program, mainShader.fragmentShader);
+	glDeleteShader(mainShader.vertexShader);
+	glDeleteShader(mainShader.fragmentShader);
+	glDeleteProgram(mainShader.program);
 }
