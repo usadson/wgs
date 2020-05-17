@@ -132,6 +132,22 @@ main(void) {
 	context = glXCreateContext(display, visualInfo, NULL, GL_TRUE);
 	glXMakeCurrent(display, window, context);
 
+	if (glewInit() != GLEW_OK) {
+		glXDestroyContext(display, context);
+		XDestroyWindow(display, window);
+		XCloseDisplay(display);
+		fputs("Failed to initialize GLEW!\n", stderr);
+		return EXIT_FAILURE;
+	}
+
+	if (!loadShaders()) {
+		glXDestroyContext(display, context);
+		XDestroyWindow(display, window);
+		XCloseDisplay(display);
+		fputs("Failed to load shaders!\n", stderr);
+		return EXIT_FAILURE;
+	}
+
 	while (running) {
 		XNextEvent(display, &ev);
 
@@ -183,7 +199,7 @@ renderFrame(void) {
 bool
 loadShaders(void) {
 	mainShader.program = glCreateProgram();
-	if (mainShader.program) {
+	if (mainShader.program == 0) {
 		fputs("[loadShaders] Failed to create shader program!", stderr);
 		return false;
 	}
@@ -206,12 +222,18 @@ loadShaders(void) {
 	glAttachShader(mainShader.program, mainShader.vertexShader);
 	glAttachShader(mainShader.program, mainShader.fragmentShader);
 
-	/* glBindAttribLocation etc */
+	glBindAttribLocation(mainShader.program, 0, "position");
+
 	glLinkProgram(mainShader.program);
 
 	/* Perform checks with glValidateProgram */
 
 	/* bind uniform locations */
+
+	GLenum err;
+	while ((err = glGetError()) != GL_NO_ERROR)
+		printf("error: %u\n", (uint32_t) err);
+
 	return true;
 }
 
