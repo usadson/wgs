@@ -82,7 +82,7 @@ main(void) {
 	Window window;
 	Screen *screen;
 	int screenId;
-	XEvent ev;
+	XEvent event;
 	XVisualInfo *visualInfo;
 	XSetWindowAttributes windowAttributes;
 
@@ -149,40 +149,35 @@ main(void) {
 	}
 
 	while (running) {
-		XNextEvent(display, &ev);
+		while (XCheckMaskEvent(display, -1, &event)) {
+			switch(event.type) {
+				case KeymapNotify:
+					XRefreshKeyboardMapping(&event.xmapping);
+					break;
+				case KeyPress:
+					len = XLookupString(&event.xkey, str, 25, &keysym, NULL);
+					str[len] = '\0';
+					if (len > 0) {
+						printf("Key pressed: '%s' %i %zu\n", str, len,
+							(size_t) keysym);
+					}
+					if (keysym == XK_Escape) {
+						running = false;
+					}
+					break;
+				case KeyRelease:
+					len = XLookupString(&event.xkey, str, 25, &keysym, NULL);
+					str[len] = '\0';
+					if (len > 0) {
+						printf("Key released: '%s' %i %zu\n", str, len,
+							(size_t) keysym);
+					}
+					break;
+			}
+		}
 
-		puts("new event");
 		renderFrame();
 		glXSwapBuffers(display, window);
-
-		switch(ev.type) {
-			case Expose:
-				renderFrame();
-				glXSwapBuffers(display, window);
-				break;
-			case KeymapNotify:
-				XRefreshKeyboardMapping(&ev.xmapping);
-				break;
-			case KeyPress:
-				len = XLookupString(&ev.xkey, str, 25, &keysym, NULL);
-				str[len] = '\0';
-				if (len > 0) {
-					printf("Key pressed: '%s' %i %zu\n", str, len,
-						   (size_t) keysym);
-				}
-				if (keysym == XK_Escape) {
-					running = false;
-				}
-				break;
-			case KeyRelease:
-				len = XLookupString(&ev.xkey, str, 25, &keysym, NULL);
-				str[len] = '\0';
-				if (len > 0) {
-					printf("Key released: '%s' %i %zu\n", str, len,
-						   (size_t) keysym);
-				}
-				break;
-		}
 	}
 
 	/* Cleanup */
