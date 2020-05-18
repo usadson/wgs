@@ -192,6 +192,7 @@ main(void) {
 
 void
 renderFrame(void) {
+	puts("RenderFrame called");
 	glClearColor((double)rand() / RAND_MAX, (double)rand() / RAND_MAX, (double)rand() / RAND_MAX, 1);
 	glClear(GL_COLOR_BUFFER_BIT);
 }
