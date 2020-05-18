@@ -43,9 +43,24 @@ extern "C" {
  */
 #include <GL/glew.h>
 
+enum CGShutdownReason {
+	CG_SR_DEBUG_ESCAPEKEY,
+};
+
+enum CGImageType {
+	CG_IT_JPEG,
+	CG_IT_PNG,
+};
+
 struct CGShaderInitData {
 	const char	*fragmentShaderFilePath;
 	const char	*vertexShaderFilePath;
+};
+
+struct CGShaderData {
+	GLuint		 fragmentShader;
+	GLuint		 program;
+	GLuint		 vertexShader;
 };
 
 struct CGMeshInitData {
@@ -55,20 +70,21 @@ struct CGMeshInitData {
 	GLsizeiptr	 verticesSize;
 };
 
-struct CGShaderData {
-	GLuint		 fragmentShader;
-	GLuint		 program;
-	GLuint		 vertexShader;
-};
-
 struct CGMeshData {
 	GLuint		 vao;
 	GLuint		 vbo;
 	GLsizei		 count;
 };
 
-enum CGShutdownReason {
-	CG_SR_DEBUG_ESCAPEKEY,
+struct CGImage {
+	size_t		 height;
+	GLuint		 texture;
+	size_t		 width;
+};
+
+struct CGImageInitData {
+	const char	*path;
+	enum CGImageType type;
 };
 
 /* float parameter is the delta time */
@@ -81,6 +97,9 @@ typedef void (*CGShutdownFunc)(void);
  */
 void
 CGCleanError(void);
+
+void
+CGDeleteImage(struct CGImage *);
 
 void
 CGDeleteMesh(struct CGMeshData *);
@@ -106,6 +125,9 @@ CGSetShutdownFunc(CGShutdownFunc);
  */
 void
 CGSetShutdown(enum CGShutdownReason);
+
+bool
+CGLoadImage(struct CGImage *, struct CGImageInitData *);
 
 bool
 CGLoadMesh(struct CGMeshData *, struct CGMeshInitData *);

@@ -45,6 +45,8 @@
 #include <GL/glew.h>
 #include <GL/glx.h>
 
+#include "stb_image.h"
+
 /** Function Prototypes **/
 void
 checkForErrors(const char *, const char *);
@@ -428,4 +430,36 @@ void
 CGDeleteMesh(struct CGMeshData *mesh) {
 	glDeleteBuffers(1, &mesh->vbo);
 	glDeleteVertexArrays(1, &mesh->vao);
+}
+
+bool
+CGLoadImage(struct CGImage *image, struct CGImageInitData *initData) {
+	int width;
+	int height;
+	int nrChannels;
+	unsigned char *data;
+
+	/* Create OpenGL buffer */
+	glGenTextures(1, &image->texture);
+	glBindTexture(GL_TEXTURE_2D, image->texture);
+
+	/* Load image using stb_image.
+	 * TODO: we can use the best/fastest image loader by checking the type from
+	 * initData.type */
+	data = stbi_load(initData->path, &width, &height, &nrChannels, 0);
+
+	image->height = height;
+	image->width = width;
+
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	stbi_image_free(data);
+
+	return true;
+}
+
+void
+CGDeleteImage(struct CGImage *image) {
+	glDeleteTextures(1, &image->texture);
 }
