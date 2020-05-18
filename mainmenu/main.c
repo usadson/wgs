@@ -151,6 +151,10 @@ main(void) {
 	while (running) {
 		XNextEvent(display, &ev);
 
+		puts("new event");
+		renderFrame();
+		glXSwapBuffers(display, window);
+
 		switch(ev.type) {
 			case Expose:
 				renderFrame();
