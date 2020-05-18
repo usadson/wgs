@@ -52,7 +52,11 @@ struct CGMeshInitData meshInitData = {
 	.verticesSize = sizeof(meshVertices)
 };
 
+static const char *shaderAttributes[] = { "position" };
+
 struct CGShaderInitData shaderInitData = {
+	.attributes = shaderAttributes,
+	.attributesCount = sizeof(shaderAttributes) / sizeof(shaderAttributes[0]),
 	.fragmentShaderFilePath = "res/fragment_shader.glsl",
 	.vertexShaderFilePath = "res/vertex_shader.glsl"
 };

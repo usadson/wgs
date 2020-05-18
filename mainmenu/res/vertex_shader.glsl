@@ -1,6 +1,6 @@
-#version 330 core
+#version 140
 
-layout (location = 0) in vec2 position;
+in vec2 position;
 
 out vec2 textureCoords;
 
