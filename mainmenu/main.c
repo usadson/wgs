@@ -52,6 +52,11 @@ struct CGMeshInitData meshInitData = {
 	.verticesSize = sizeof(meshVertices)
 };
 
+struct CGImageInitData imageInitData = {
+	.path = "res/cc0textures-bricks047.jpg",
+	.type = CG_IT_JPEG
+};
+
 static const char *shaderAttributes[] = { "position" };
 
 struct CGShaderInitData shaderInitData = {
@@ -64,6 +69,17 @@ struct CGShaderInitData shaderInitData = {
 /** Global variables **/
 struct CGShaderData	shader;
 struct CGMeshData	mesh;
+struct CGImage		image;
+
+GLint				uniformMatrix;
+GLint				uniformSampler;
+
+GLfloat				transformationMatrix[] = {
+	1, 0, 0, 0,
+	0, 1, 0, 0,
+	0, 0, 1, 0,
+	0, 0, 0, 1
+};
 
 bool
 mainMenuRenderer(float deltaTime);
@@ -84,8 +100,20 @@ main(void) {
 		return EXIT_FAILURE;
 	}
 
+	uniformMatrix = glGetUniformLocation(shader.program,
+										 "transformationMatrix");
+	uniformSampler = glGetUniformLocation(shader.program, "textureSampler");
+
 	if (!CGLoadMesh(&mesh, &meshInitData)) {
 		fputs("[Main] CGLoadMesh failed.\n", stderr);
+		CGDeleteShader(&shader);
+		CGCleanError();
+		return EXIT_FAILURE;
+	}
+
+	if (!CGLoadImage(&image, &imageInitData)) {
+		fputs("[Main] CGLoadMesh failed.\n", stderr);
+		CGDeleteMesh(&mesh);
 		CGDeleteShader(&shader);
 		CGCleanError();
 		return EXIT_FAILURE;
@@ -103,6 +131,12 @@ mainMenuRenderer(float deltaTime) {
 	(void) deltaTime;
 
 	glUseProgram(shader.program);
+	glUniformMatrix4fv(uniformMatrix, 1, GL_FALSE, transformationMatrix);
+	glUniform1i(uniformSampler, 0);
+
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, image.texture);
+
 	glBindVertexArray(mesh.vao);
 	glDrawArrays(GL_TRIANGLES, 0, mesh.count);
 
@@ -111,6 +145,7 @@ mainMenuRenderer(float deltaTime) {
 
 void
 shutdownFunction(void) {
-	CGDeleteShader(&shader);
+	CGDeleteImage(&image);
 	CGDeleteMesh(&mesh);
+	CGDeleteShader(&shader);
 }
