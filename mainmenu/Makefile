@@ -1,11 +1,12 @@
 CC = clang
-CFLAGS = -g -Og -I. -I/usr/local/include
-LDFLAGS = -L/usr/local/lib -L/usr/lib64 \
-	  -lpthread \
-	  -lX11 \
-	  -lGLEW -lGLU -lm -lGL
+INCLUDE = -I. -I/usr/local/include -I../libcoregraphics
+LIBRARIES = -lpthread -lX11 -lGLEW -lGLU -lm -lGL ../libcoregraphics/libcg
+OPTIMIZATION = -g -Og
+WARNINGS = -Wall -Wextra -Werror
+CFLAGS = $(WARNINGS) $(OPTIMIZATION) $(INCLUDE)
+LDFLAGS = $(LIBRARIES)
 
-test: main.c
+test: main.c ../libcoregraphics/libcg
 	$(CC) $(CFLAGS) -o $@ main.c $(LDFLAGS)
 
 clean:

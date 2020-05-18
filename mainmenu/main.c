@@ -36,393 +36,77 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/keysymdef.h>
+#include "libcg.h"
 
-#include <GL/glew.h>
-#include <GL/glx.h>
-
-struct ShaderData {
-	GLuint	fragmentShader;
-	GLuint	program;
-	GLuint	vertexShader;
+/** Init Data */
+GLfloat meshVertices[] = {
+	-0.5f, -0.5f,
+	 0.5f, -0.5f,
+	 0.0f,  0.5f
 };
 
-struct MeshData {
-	GLuint	vao;
-	GLuint	vbo;
-	GLsizei	count;
+struct CGMeshInitData meshInitData = {
+	.dimensions = 2,
+	.vertexCount = 3,
+	.vertices = meshVertices,
+	.verticesSize = sizeof(meshVertices)
 };
 
-/** Function Prototypes **/
-void
-checkForErrors(const char *, const char *);
-
-void
-cleanMeshData(void);
-
-void
-cleanShaders();
-
-bool
-createMeshData(void);
-
-char *
-loadFile(const char *);
-
-bool
-loadShader(const char *, GLenum, GLuint *);
-
-bool
-loadShaders(void);
-
-void
-renderFrame(void);
-
-
-/** Strings **/
-const char *fragShaderPath = "res/fragment_shader.glsl";
-const char *vertShaderPath = "res/vertex_shader.glsl";
+struct CGShaderInitData shaderInitData = {
+	.fragmentShaderFilePath = "res/fragment_shader.glsl",
+	.vertexShaderFilePath = "res/vertex_shader.glsl"
+};
 
 /** Global variables **/
-GLint att[] = { GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None };
-struct ShaderData	mainShader;
-struct MeshData		mainMesh;
+struct CGShaderData	shader;
+struct CGMeshData	mesh;
+
+bool
+mainMenuRenderer(float deltaTime);
+
+void
+shutdownFunction(void);
 
 int
 main(void) {
-	/* X info */
-	Display *display;
-	Window rootWindow;
-	Window window;
-	Screen *screen;
-	int screenId;
-	XEvent event;
-	XVisualInfo *visualInfo;
-	XSetWindowAttributes windowAttributes;
-
-	/* GLX info */
-	Colormap colormap;
-	GLXContext context;
-
-	display = XOpenDisplay(NULL);
-	if (display == NULL) {
-		fputs("Could not open display", stderr);
-		return 1;
-	}
-
-	screen = DefaultScreenOfDisplay(display);
-	screenId = DefaultScreen(display);
-	rootWindow = RootWindowOfScreen(screen);
-
-	visualInfo = glXChooseVisual(display, 0, att);
-
-	if (visualInfo == NULL) {
-		XCloseDisplay(display);
-		printf("\n\tno appropriate visual found\n\n");
+	if (!CGInitialize()) {
+		fputs("[Main] CGInitialize failed.\n", stderr);
 		return EXIT_FAILURE;
 	}
 
-	colormap = XCreateColormap(display, rootWindow, visualInfo->visual, AllocNone);
-
-	windowAttributes.colormap = colormap;
-	windowAttributes.event_mask = ExposureMask
-								| KeyPressMask
-								| KeyReleaseMask
-								| KeymapStateMask;
-
-	window = XCreateWindow(display, rootWindow, 0, 0,
-						   screen->width, screen->height, 0,
-						   visualInfo->depth, InputOutput, visualInfo->visual,
-						   CWColormap | CWEventMask, &windowAttributes);
-
-	XClearWindow(display, window);
-	XMapRaised(display, window);
-
-	char str[25] = {0}; 
-	KeySym keysym = 0;
-	int len = 0;
-	bool running = true;
-
-	context = glXCreateContext(display, visualInfo, NULL, GL_TRUE);
-	glXMakeCurrent(display, window, context);
-
-	if (glewInit() != GLEW_OK) {
-		glXDestroyContext(display, context);
-		XDestroyWindow(display, window);
-		XCloseDisplay(display);
-		fputs("Failed to initialize GLEW!\n", stderr);
+	if (!CGLoadShader(&shader, &shaderInitData)) {
+		fputs("[Main] GCLoadShader failed.\n", stderr);
+		CGCleanError();
 		return EXIT_FAILURE;
 	}
 
-	if (!loadShaders()) {
-		fputs("Failed to load shaders!\n", stderr);
-		glXDestroyContext(display, context);
-		XDestroyWindow(display, window);
-		XCloseDisplay(display);
+	if (!CGLoadMesh(&mesh, &meshInitData)) {
+		fputs("[Main] CGLoadMesh failed.\n", stderr);
+		CGDeleteShader(&shader);
+		CGCleanError();
 		return EXIT_FAILURE;
 	}
 
-	if (!createMeshData()) {
-		fputs("Failed to create mesh data!\n", stderr);
-		cleanShaders();
-		glXDestroyContext(display, context);
-		XDestroyWindow(display, window);
-		XCloseDisplay(display);
-		return EXIT_FAILURE;
-	}
+	CGSetRenderFunc(mainMenuRenderer);
+	CGSetShutdownFunc(shutdownFunction);
 
-	while (running) {
-		while (XCheckMaskEvent(display, -1, &event)) {
-			switch(event.type) {
-				case KeymapNotify:
-					XRefreshKeyboardMapping(&event.xmapping);
-					break;
-				case KeyPress:
-					len = XLookupString(&event.xkey, str, 25, &keysym, NULL);
-					str[len] = '\0';
-					if (len > 0) {
-						printf("Key pressed: '%s' %i %zu\n", str, len,
-							(size_t) keysym);
-					}
-					if (keysym == XK_Escape) {
-						running = false;
-					}
-					break;
-				case KeyRelease:
-					len = XLookupString(&event.xkey, str, 25, &keysym, NULL);
-					str[len] = '\0';
-					if (len > 0) {
-						printf("Key released: '%s' %i %zu\n", str, len,
-							(size_t) keysym);
-					}
-					break;
-			}
-		}
-
-		renderFrame();
-		glXSwapBuffers(display, window);
-	}
-
-	/* Cleanup */
-	cleanMeshData();
-	cleanShaders();
-
-	XDestroyWindow(display, window);
-	XCloseDisplay(display);
-
-	return EXIT_SUCCESS;
+	return CGStart();
 }
 
+/* new shit */
 bool
-loadShaders(void) {
-	mainShader.program = glCreateProgram();
-	if (mainShader.program == 0) {
-		fputs("[loadShaders] Failed to create shader program!", stderr);
-		return false;
-	}
+mainMenuRenderer(float deltaTime) {
+	(void) deltaTime;
 
-	if (!loadShader(vertShaderPath, GL_VERTEX_SHADER,
-					&mainShader.vertexShader)) {
-		glDeleteProgram(mainShader.program);
-		fputs("[loadShaders] Failed to load vertex shader!", stderr);
-		return false;
-	}
-
-	if (!loadShader(fragShaderPath, GL_FRAGMENT_SHADER,
-					&mainShader.fragmentShader)) {
-		glDeleteShader(mainShader.vertexShader);
-		glDeleteProgram(mainShader.program);
-		fputs("[loadShaders] Failed to load fragment shader!", stderr);
-		return false;
-	}
-
-	glAttachShader(mainShader.program, mainShader.vertexShader);
-	glAttachShader(mainShader.program, mainShader.fragmentShader);
-
-	glBindAttribLocation(mainShader.program, 0, "position");
-
-	glLinkProgram(mainShader.program);
-
-	/* Perform checks with glValidateProgram */
-
-	/* bind uniform locations */
-
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR)
-		printf("error: %u\n", (uint32_t) err);
-
-	return true;
-}
-
-char *
-loadFile(const char *path) {
-	char		*buf;
-	int			 fd;
-	size_t		 len;
-	char		*pos;
-	ssize_t		 ret;
-	struct stat	 status;
-
-	fd = open(path, O_RDONLY);
-	if (fd == -1) {
-		perror("open() failure");
-		fprintf(stderr, "Failed to open '%s'. "
-				"See the error described above.\n", path);
-		return NULL;
-	}
-
-	if (fstat(fd, &status) == -1) {
-		perror("fstat() failure");
-		close(fd);
-		fprintf(stderr, "Failed to stat() '%s'. "
-			   "See the error described above.\n", path);
-		return NULL;
-	}
-
-	if (!S_ISREG(status.st_mode)) {
-		close(fd);
-		printf("'%s' isn't a normal file!\n", path);
-		return NULL;
-	}
-
-	len = (size_t) status.st_size;
-	buf = malloc(status.st_size + 1);
-	buf[len] = '\0';
-
-	if (buf == NULL) {
-		perror("Failed to allocate data for file");
-		close(fd);
-		fprintf(stderr, "Failed to allocate data for file '%s'!\n", path);
-		return NULL;
-	}
-
-	pos = buf;
-	while (len > 0) {
-		ret = read(fd, pos, len);
-
-		if (ret == 0)
-			break;
-
-		if (ret == -1) {
-			perror("Failed to read from file");
-			close(fd);
-			fprintf(stderr, "Failed to read from file '%s'!\n", path);
-			return NULL;
-		}
-
-		len -= ret;
-		pos += ret;
-	}
-
-	close(fd);
-	return buf;
-}
-
-bool
-loadShader(const char *path, GLenum type, GLuint *dest) {
-	GLuint	 shader;
-	char	*shaderData;
-	GLint	 status;
-
-	shader = glCreateShader(type);
-	if (shader == 0) {
-		fputs("[loadShader] Failed to glCreateShader()!\n", stderr);
-		return false;
-	}
-
-	shaderData = loadFile(path);
-	if (shaderData == NULL) {
-		glDeleteShader(shader);
-		fputs("[loadShader] Failed to load shader file!\n", stderr);
-		return false;
-	}
-
-	glShaderSource(shader, 1, (const char *const *) &shaderData, NULL);
-	free(shaderData);
-	glCompileShader(shader);
-
-	glGetShaderiv(shader, GL_COMPILE_STATUS, &status);
-	if (status == GL_FALSE) {
-		glDeleteShader(shader);
-		fputs("[loadShader] Failed to compile shader!\n", stderr);
-		return false;
-	}
-
-	glUseProgram(shader);
-
-	*dest = shader;
-	return true;
-}
-
-void
-cleanShaders(void) {
-	glDetachShader(mainShader.program, mainShader.vertexShader);
-	glDetachShader(mainShader.program, mainShader.fragmentShader);
-	glDeleteShader(mainShader.vertexShader);
-	glDeleteShader(mainShader.fragmentShader);
-	glDeleteProgram(mainShader.program);
-}
-
-bool
-createMeshData(void) {
-	GLfloat vertices[] = {
-		-0.5f, -0.5f,
-		 0.5f, -0.5f,
-		 0.0f,  0.5f,
-	};
-
-	/* Vertex/Index count */
-	mainMesh.count = 3;
-
-	glGenVertexArrays(1, &mainMesh.vao);
-	glBindVertexArray(mainMesh.vao);
-
-	glGenBuffers(1, &mainMesh.vbo);
-	glBindBuffer(GL_ARRAY_BUFFER, mainMesh.vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-
-	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), NULL);
-	checkForErrors("createMeshData", "post");
+	glUseProgram(shader.program);
+	glBindVertexArray(mesh.vao);
+	glDrawArrays(GL_TRIANGLES, 0, mesh.count);
 
 	return true;
 }
 
 void
-cleanMeshData(void) {
-	glDeleteBuffers(1, &mainMesh.vbo);
-	glDeleteVertexArrays(1, &mainMesh.vao);
-}
-
-void
-renderFrame(void) {
-	glClearColor(0, 0, 0, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
-	checkForErrors("renderFrame", "clear");
-
-	glUseProgram(mainShader.program);
-	glBindVertexArray(mainMesh.vao);
-	glDrawArrays(GL_TRIANGLES, 0, mainMesh.count);
-	checkForErrors("renderFrame", "postRender");
-}
-
-void
-checkForErrors(const char *namespace, const char *section) {
-	const char *message;
-	GLenum err;
-	while ((err = glGetError()) != GL_NO_ERROR) {
-		switch (err) {
-			case GL_INVALID_ENUM:		message = "GL_INVALID_ENUM";
-			case GL_INVALID_VALUE:		message = "GL_INVALID_VALUE";
-			case GL_INVALID_OPERATION:	message = "GL_INVALID_OPERATION";
-			case GL_STACK_OVERFLOW:		message = "GL_STACK_OVERFLOW";
-			case GL_STACK_UNDERFLOW:	message = "GL_STACK_UNDERFLOW";
-			case GL_OUT_OF_MEMORY:		message = "GL_OUT_OF_MEMORY";
-			default:					message = "undefined";
-		}
-		fprintf(stderr, "[%s] [%s] [OpenGLError] %s\n", namespace, section,
-				message);
-	}
+shutdownFunction(void) {
+	CGDeleteShader(&shader);
+	CGDeleteMesh(&mesh);
 }
