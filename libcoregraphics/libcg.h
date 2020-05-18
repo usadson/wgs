@@ -53,6 +53,8 @@ enum CGImageType {
 };
 
 struct CGShaderInitData {
+	const char	**attributes;
+	size_t		 attributesCount;
 	const char	*fragmentShaderFilePath;
 	const char	*vertexShaderFilePath;
 };

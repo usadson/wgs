@@ -204,6 +204,8 @@ CGDeleteShader(struct CGShaderData *shader) {
 
 bool
 CGLoadShader(struct CGShaderData *shader, struct CGShaderInitData *initInfo) {
+	size_t i;
+
 	shader->program = glCreateProgram();
 	if (shader->program == 0) {
 		fputs("[CGLoadShader] Failed to create shader program!\n", stderr);
@@ -227,6 +229,9 @@ CGLoadShader(struct CGShaderData *shader, struct CGShaderInitData *initInfo) {
 
 	glAttachShader(shader->program, shader->vertexShader);
 	glAttachShader(shader->program, shader->fragmentShader);
+
+	for (i = 0; i < initInfo->attributesCount; i++)
+		glBindAttribLocation(shader->program, i, initInfo->attributes[i]);
 
 	glLinkProgram(shader->program);
 
@@ -405,7 +410,6 @@ checkForErrors(const char *namespace, const char *section) {
 				message);
 	}
 }
-
 
 void
 CGSetShutdownFunc(CGShutdownFunc func) {
