@@ -44,14 +44,29 @@
 #include <GL/glx.h>
 
 struct ShaderData {
-	GLuint		fragmentShader;
-	GLuint		program;
-	GLuint		vertexShader;
+	GLuint	fragmentShader;
+	GLuint	program;
+	GLuint	vertexShader;
+};
+
+struct MeshData {
+	GLuint	vao;
+	GLuint	vbo;
+	GLsizei	count;
 };
 
 /** Function Prototypes **/
 void
+checkForErrors(const char *, const char *);
+
+void
+cleanMeshData(void);
+
+void
 cleanShaders();
+
+bool
+createMeshData(void);
 
 char *
 loadFile(const char *);
@@ -73,6 +88,7 @@ const char *vertShaderPath = "res/vertex_shader.glsl";
 /** Global variables **/
 GLint att[] = { GLX_RGBA, GLX_DEPTH_SIZE, 24, GLX_DOUBLEBUFFER, None };
 struct ShaderData	mainShader;
+struct MeshData		mainMesh;
 
 int
 main(void) {
@@ -141,10 +157,19 @@ main(void) {
 	}
 
 	if (!loadShaders()) {
+		fputs("Failed to load shaders!\n", stderr);
 		glXDestroyContext(display, context);
 		XDestroyWindow(display, window);
 		XCloseDisplay(display);
-		fputs("Failed to load shaders!\n", stderr);
+		return EXIT_FAILURE;
+	}
+
+	if (!createMeshData()) {
+		fputs("Failed to create mesh data!\n", stderr);
+		cleanShaders();
+		glXDestroyContext(display, context);
+		XDestroyWindow(display, window);
+		XCloseDisplay(display);
 		return EXIT_FAILURE;
 	}
 
@@ -181,19 +206,13 @@ main(void) {
 	}
 
 	/* Cleanup */
+	cleanMeshData();
 	cleanShaders();
 
 	XDestroyWindow(display, window);
 	XCloseDisplay(display);
 
 	return EXIT_SUCCESS;
-}
-
-void
-renderFrame(void) {
-	puts("RenderFrame called");
-	glClearColor((double)rand() / RAND_MAX, (double)rand() / RAND_MAX, (double)rand() / RAND_MAX, 1);
-	glClear(GL_COLOR_BUFFER_BIT);
 }
 
 bool
@@ -331,6 +350,8 @@ loadShader(const char *path, GLenum type, GLuint *dest) {
 		return false;
 	}
 
+	glUseProgram(shader);
+
 	*dest = shader;
 	return true;
 }
@@ -342,4 +363,66 @@ cleanShaders(void) {
 	glDeleteShader(mainShader.vertexShader);
 	glDeleteShader(mainShader.fragmentShader);
 	glDeleteProgram(mainShader.program);
+}
+
+bool
+createMeshData(void) {
+	GLfloat vertices[] = {
+		-0.5f, -0.5f,
+		 0.5f, -0.5f,
+		 0.0f,  0.5f,
+	};
+
+	/* Vertex/Index count */
+	mainMesh.count = 3;
+
+	glGenVertexArrays(1, &mainMesh.vao);
+	glBindVertexArray(mainMesh.vao);
+
+	glGenBuffers(1, &mainMesh.vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, mainMesh.vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(GLfloat), NULL);
+	checkForErrors("createMeshData", "post");
+
+	return true;
+}
+
+void
+cleanMeshData(void) {
+	glDeleteBuffers(1, &mainMesh.vbo);
+	glDeleteVertexArrays(1, &mainMesh.vao);
+}
+
+void
+renderFrame(void) {
+	glClearColor(0, 0, 0, 1);
+	glClear(GL_COLOR_BUFFER_BIT);
+	checkForErrors("renderFrame", "clear");
+
+	glUseProgram(mainShader.program);
+	glBindVertexArray(mainMesh.vao);
+	glDrawArrays(GL_TRIANGLES, 0, mainMesh.count);
+	checkForErrors("renderFrame", "postRender");
+}
+
+void
+checkForErrors(const char *namespace, const char *section) {
+	const char *message;
+	GLenum err;
+	while ((err = glGetError()) != GL_NO_ERROR) {
+		switch (err) {
+			case GL_INVALID_ENUM:		message = "GL_INVALID_ENUM";
+			case GL_INVALID_VALUE:		message = "GL_INVALID_VALUE";
+			case GL_INVALID_OPERATION:	message = "GL_INVALID_OPERATION";
+			case GL_STACK_OVERFLOW:		message = "GL_STACK_OVERFLOW";
+			case GL_STACK_UNDERFLOW:	message = "GL_STACK_UNDERFLOW";
+			case GL_OUT_OF_MEMORY:		message = "GL_OUT_OF_MEMORY";
+			default:					message = "undefined";
+		}
+		fprintf(stderr, "[%s] [%s] [OpenGLError] %s\n", namespace, section,
+				message);
+	}
 }
