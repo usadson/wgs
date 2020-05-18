@@ -1,6 +1,7 @@
 CC = clang
 INCLUDE = -I. -I/usr/local/include -I../libcoregraphics
-LIBRARIES = -lpthread -lX11 -lGLEW -lGLU -lm -lGL ../libcoregraphics/libcg
+LIBCG = ../libcoregraphics/libcg ../libcoregraphics/stb_image
+LIBRARIES = -L/usr/local/lib -L/usr/lib64 -lpthread -lX11 -lGLEW -lGLU -lm -lGL $(LIBCG)
 OPTIMIZATION = -g -Og
 WARNINGS = -Wall -Wextra -Werror
 CFLAGS = $(WARNINGS) $(OPTIMIZATION) $(INCLUDE)
